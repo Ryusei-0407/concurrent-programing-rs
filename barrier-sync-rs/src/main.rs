@@ -10,7 +10,7 @@ fn main() {
     for _ in 0..10 {
         let b = barrier.clone();
         let th = thread::spawn(move || {
-            b.wait();
+            b.wait(); // Wait for all threads to reach this point
             println!("finished barrier");
         });
         v.push(th);
