@@ -1,28 +1,27 @@
-use std::sync::{Arc, Mutex};
+use tokio::sync::oneshot;
 
-const NUM_TASKS: usize = 4;
-const NUM_LOOP: usize = 100000;
+async fn set_val_later(tx: oneshot::Sender<i32>) {
+    let ten_secs = std::time::Duration::from_secs(10);
+    tokio::time::sleep(ten_secs).await;
+    if let Err(_) = tx.send(100) {
+        println!("failed to send");
+    }
+}
 
 #[tokio::main]
-async fn main() -> Result<(), tokio::task::JoinError> {
-    let val = Arc::new(Mutex::new(0));
-    let mut v = Vec::new();
-    for _ in 0..NUM_TASKS {
-        let n = val.clone();
-        let t = tokio::spawn(async move {
-            for _ in 0..NUM_LOOP {
-                let mut n0 = n.lock().unwrap();
-                *n0 += 1;
-            }
-        });
+async fn main() {
+    let (tx, rx) = oneshot::channel();
 
-        v.push(t);
+    tokio::spawn(set_val_later(tx));
+
+    match rx.await {
+        Ok(n) => {
+            println!("n = {n}");
+        }
+        Err(e) => {
+            println!("failed to receive: {e}");
+            return;
+        }
     }
-
-    for i in v {
-        i.await?;
-    }
-
-    println!("COUNT = {} (expected = {})", *val.lock().unwrap(), NUM_LOOP * NUM_TASKS);
-    Ok(())
 }
+
