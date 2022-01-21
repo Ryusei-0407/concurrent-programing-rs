@@ -1,27 +1,31 @@
-use tokio::sync::oneshot;
-
-async fn set_val_later(tx: oneshot::Sender<i32>) {
+fn do_block(n: u64) -> u64 {
     let ten_secs = std::time::Duration::from_secs(10);
-    tokio::time::sleep(ten_secs).await;
-    if let Err(_) = tx.send(100) {
-        println!("failed to send");
+    std::thread::sleep(ten_secs);
+    n
+}
+
+async fn do_print() {
+    let sec = std::time::Duration::from_secs(1);
+    for _ in 0..20 {
+        tokio::time::sleep(sec).await;
+        println!("wake up");
     }
 }
 
 #[tokio::main]
-async fn main() {
-    let (tx, rx) = oneshot::channel();
-
-    tokio::spawn(set_val_later(tx));
-
-    match rx.await {
-        Ok(n) => {
-            println!("n = {n}");
-        }
-        Err(e) => {
-            println!("failed to receive: {e}");
-            return;
-        }
+pub async fn main() {
+    let mut v = Vec::new();
+    for n in 0..32 {
+        let t = tokio::task::spawn_blocking(move || do_block(n));
+        v.push(t);
     }
-}
 
+    let p = tokio::spawn(do_print());
+
+    for t in v {
+        let n = t.await.unwrap();
+        println!("finished: {n}");
+    }
+
+    p.await.unwrap()
+}
